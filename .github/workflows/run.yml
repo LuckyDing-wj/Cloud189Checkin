@@ -17,10 +17,10 @@ jobs:
         run: sleep $((RANDOM % 301))
 
       - name: 🔌 Check out code
-        uses: actions/checkout@main
+        uses: actions/checkout@v4
 
       - name: 🔨 Setup Node.js environment
-        uses: actions/setup-node@main
+        uses: actions/setup-node@v4
         with:
           node-version: 18
           cache: npm
@@ -29,14 +29,24 @@ jobs:
         if: vars.debug == '1'
         run: |
           echo "CLOUD189_VERBOSE=1" >> $GITHUB_ENV
-      
-      - name: 📹 Restore cached Cookie
-        id: cache-cookie-restore
-        uses: actions/cache/restore@v4
+
+      # --- 修改开始 ---
+      # 1. 合并 restore 和 save 步骤为一个，这是最核心的修改。
+      # 2. 修正了 `key` 的生成逻辑，现在它会根据 `.token` 文件本身的内容来生成哈希值。
+      #    这意味着只有当 `npm start` 成功运行并更新了 `.token` 文件后，才会保存一个新的缓存。
+      - name: 📹 Cache and Restore Cookie
+        id: cache-cookie
+        uses: actions/cache@v4
         with:
+          # 路径依然是 .token 文件
           path: .token
-          key: ${{ runner.os }}-cache-token
-          restore-keys: ${{ runner.os }}-cache-token-
+          # 主 key：基于操作系统和 .token 文件的内容哈希。
+          # 如果 .token 文件不存在或内容未变，哈希值也一样，会命中旧缓存。
+          key: ${{ runner.os }}-cache-token-${{ hashFiles('.token') }}
+          # 备用 key (restore-keys)：当主 key 找不到时，使用这个更通用的 key 来尝试恢复一个最近的缓存。
+          restore-keys: |
+            ${{ runner.os }}-cache-token-
+      # --- 修改结束 ---
 
       - name: 🔧 Init secrets
         uses: shine1594/secrets-to-env-action@master
@@ -56,20 +66,23 @@ jobs:
           max_attempts: 3
           command: npm start
       
-      - name: 📹 Save cached Cookie
-        uses: actions/cache/save@v4
-        with:
-          path: .token
-          key: ${{ runner.os }}-cache-token-${{ hashFiles('.token/*.json') }}
+      # 之前的 `save` 步骤已经被合并，所以这里删掉它
 
       - name: 🚗 Keep Running
+        # 增加一个条件判断：仅在定时任务触发时才执行自动提交
         if: github.event_name == 'schedule'
         run: |
           git config --local user.email "${{ github.actor_id }}+${{ github.actor }}@users.noreply.github.com"
           git config --local user.name "${{ github.actor }}"
           git remote set-url origin https://${{ github.actor }}:${{ github.token }}@github.com/${{ github.repository }}
           git pull --rebase --autostash
-          git commit --allow-empty -m "Keep Running..."
+          # 增加一个判断，如果 .token 文件有变化才提交，避免无意义的 "Keep Running" 提交
+          if ! git diff --quiet .token; then
+            git add .token
+            git commit -m "feat: Update token by schedule"
+          else
+            git commit --allow-empty -m "ci: Keep workflow running"
+          fi
           git push
 
       - name: 🎉 Delete old workflow run
@@ -79,3 +92,4 @@ jobs:
           repository: ${{ github.repository }}
           retain_days: 0
           keep_minimum_runs: 50
+
