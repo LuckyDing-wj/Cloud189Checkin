@@ -20,3 +20,7 @@ cheese.log
 .token
 
 .logs
+
+.env
+
+actionslog.log

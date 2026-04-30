@@ -1,156 +1,218 @@
 # Cloud189Checkin
 
-天翼网盘自动签到（随机容量），~~家庭空间签到（随机容量）~~。
+天翼网盘自动签到，通过 GitHub Actions 每日自动执行，无需服务器。
 
-# 重要说明！！！
+## 重要说明
 
-请勿直接修改 .env，然后提交到 github，源码仓库是公开的，别人可以直接看到你的账号密码。因为错误使用本仓库导致账号密码泄漏，并且在使用这个脚本出现账户异常情况，本人概不负责！！！
-如果遇到设备ID不存在，需要二次设备校验，请先参考[这个](https://github.com/wes-lin/Cloud189Checkin/issues/165)关闭自己的设备锁。
+- **请勿**将账号密码直接写入 `.env` 并提交到仓库，源码仓库是公开的，他人可以看到你的账号密码
+- 所有敏感信息必须通过 GitHub Secrets 或 Environment Variables 配置
+- 因错误使用本仓库导致账号密码泄漏，本人概不负责
+- 如果遇到设备 ID 不存在，需要二次设备校验，请先参考 [#165](https://github.com/wes-lin/Cloud189Checkin/issues/165) 关闭设备锁
 
+## 目录
 
-# **目录**
-
-- [GitHub Action 运行](#GitHubAction运行)
+- [部署教程](#部署教程)
+  - [第一步：Fork 仓库](#第一步fork-仓库)
+  - [第二步：设置工作流权限](#第二步设置工作流权限)
+  - [第三步：创建环境](#第三步创建环境)
+  - [第四步：配置账号](#第四步配置账号)
+  - [第五步：启用 Actions](#第五步启用-actions)
+  - [第六步：手动运行测试](#第六步手动运行测试)
+  - [查看运行结果](#查看运行结果)
+- [设置推送通知](#设置推送通知)
+- [常见问题](#常见问题)
 - [本地运行](#本地运行)
-- [设置推送](#设置推送)
-- [玄武-青龙面板](#玄武-青龙面板)
-- [其他环境集成](#其他环境集成)
-- [交流群](#交流群)
-- [更新内容](#更新内容)
 
-## GitHub Action 运行
+---
 
-### Fork 此仓库
+## 部署教程
 
-![](https://cdn.jsdelivr.net/gh/wes-lin/Cloud189Checkin/image/fork.png)
+### 第一步：Fork 仓库
 
-### 设置工作流权限
+1. 点击页面右上角的 **Fork** 按钮
+2. 选择你的 GitHub 账户，点击 **Create fork**
+3. 等待 Fork 完成，你将获得一个属于自己的仓库副本
 
-将 Settings -> Actions -> Workflow permissions 改成 Read and write permissions
-![](https://github.com/user-attachments/assets/28d27a78-73f2-489e-aa7e-cac87c0fc509)
+### 第二步：设置工作流权限
 
-### 设置账号密码
+1. 进入你 Fork 后的仓库
+2. 点击 **Settings** → **Actions** → **General**
+3. 找到 **Workflow permissions**，选择 **Read and write permissions**
+4. 点击 **Save** 保存
 
-新版本的 git Action 需要创建 environment 来配合使用，创建一个名为 user 的环境
-![](https://cdn.jsdelivr.net/gh/wes-lin/Cloud189Checkin/image/env.png)
+> 这一步是必需的，因为 workflow 中的 "Keep Running" 步骤需要向仓库推送空提交来保持 Actions 活跃。
 
-方式一：编辑 user 环境，添加变量 TY_ACCOUNTS userName 和 password 为你的天翼账号和密码,可以添加多个账号如[{"userName":"账号 1","password":"账号 1 的密码"},{"userName":"账号 2","password":"账号 2 的密码"}]
-![](https://cdn.jsdelivr.net/gh/wes-lin/Cloud189Checkin/image/accounts.jpg)
+### 第三步：创建环境
 
-如果你遇到你账号密码中有特殊字符如#$等无法解析的[SyntaxError](https://github.com/wes-lin/Cloud189Checkin/issues/76),请在你的配置中将TY_ACCOUNTS用单引号包起来
-例如'[{"userName":"1234567890","password":"123334#$#$"}]'
+1. 进入仓库 **Settings** → **Environments**
+2. 点击 **New environment**
+3. 名称输入 `user`，点击 **Configure environment**
+4. 环境创建完成，后续在此环境中添加变量
 
-方式二：如果你的账号有多个并且经常变动，推荐这个方式
-同样在 user 环境中添加变量，用户名环境变量TY_USERNAME_{index},账号密码环境变量TY_PASSWORD_{index},如添加第一个账号则是TY_USERNAME_1，第一个账号密码是TY_PASSWORD_1,第二个账号则是TY_USERNAME_2，第二个账号密码是TY_PASSWORD_2,以此类推。
-![](https://cdn.jsdelivr.net/gh/wes-lin/Cloud189Checkin/image/account.png)
+### 第四步：配置账号
 
-## 设置推送
+进入刚创建的 `user` 环境，点击 **Add variable** 添加账号信息。
 
-### Server 酱
+**方式一：JSON 格式（推荐单账号或少量账号）**
 
-为了考虑到不同客户端兼容性,采用了 Server 酱,只需多配置下 SENDKEY
-![](https://cdn.jsdelivr.net/gh/wes-lin/Cloud189Checkin/image/push.png)就行,Server 酱的配置和 sendkey 的获取可参看[Server 酱官网](https://sct.ftqq.com/)
+| 变量名 | 值 |
+|---|---|
+| `TY_ACCOUNTS` | `[{"userName":"你的手机号","password":"你的密码"}]` |
 
-### TelegramBot 推送
+多个账号示例：
+```json
+[{"userName":"13800000001","password":"密码1"},{"userName":"13800000002","password":"密码2"}]
+```
 
-- `TELEGRAM_BOT_TOKEN` _Telegram Bot Token_
-- `TELEGRAM_CHAT_ID` _Telegram 接收推送消息的会话 ID_
+> 如果密码中包含 `#`、`$` 等特殊字符导致 [SyntaxError](https://github.com/wes-lin/Cloud189Checkin/issues/76)，请将整个 JSON 用单引号包裹：
+> `[{"userName":"1234567890","password":"pass#$word"}]`
 
-### 微信群机器人推送
+**方式二：逐个配置（推荐多账号且变动频繁）**
 
-- `WECOM_BOT_KEY ` _微信群机器人 webhook_
-- `WECOM_BOT_TELPHONE ` _接收推送手机号_
-  [群机器人配置说明](https://developer.work.weixin.qq.com/document/path/91770)
+在 `user` 环境中逐个添加变量：
 
-### WxPusher 推送
+| 变量名 | 值 |
+|---|---|
+| `TY_USERNAME_1` | 第一个账号的手机号 |
+| `TY_PASSWORD_1` | 第一个账号的密码 |
+| `TY_USERNAME_2` | 第二个账号的手机号 |
+| `TY_PASSWORD_2` | 第二个账号的密码 |
+| ... | 以此类推 |
 
-- `WX_PUSHER_APP_TOKEN ` _WxPuser 推送 AppToken_
-- `WX_PUSHER_UID ` _接收推送 UID_
-  默认使用是我的 WxPusher,你也可以改成你自己 wxPusher 开发者账户,修改 WX_PUSHER_APP_TOKEN. 如果想直接使用我的 wxPush 应用,请扫描底下二维码进行关联.
-  https://wxpusher.zjiecode.com/api/qrcode/4Ix7noqD3L7DMBoSlvig3t4hqjFWzPkdHqAYsg8IzkPreW7d8uGUHi9LJO4EcyJg.jpg
-  然后拿到 UID 后,把 WX_PUSHER_UID 配成你拿到的 UID.
-  ![](https://cdn.jsdelivr.net/gh/wes-lin/Cloud189Checkin/image/wxpusher.jpg)
+### 第五步：启用 Actions
 
-### PushPlus 推送
+1. 进入仓库的 **Actions** 页面
+2. 如果提示 **I understand my workflows, go ahead and enable them**，点击启用
+3. workflow 已配置为每天 UTC 02:35（北京时间 10:35）自动执行
 
-- `PUSH_PLUS_TOKEN ` _pushPlus 推送 token_
-- 注册和获取 token：https://www.pushplus.plus/uc.html
-- 拿到 token 后，把 PUSH_PLUS_TOKEN 配成你拿到的 token.
-- 免费用户每天有 200 条推送额度
+### 第六步：手动运行测试
 
-### ShowDoc 推送
-
-- `SHOWDOC_KEY ` _ShowDoc 推送 key_
-- ShowDoc 官网：https://push.showdoc.com.cn
-- 打开官网，关注公众号，拿到 key 后，把 SHOWDOC_KEY 配成你拿到的 key
-- 使用简单、开箱可用、长期维护、持续免费、编程可玩、不限制消息数量、不限制请求数
-
-### Bark 推送 (仅支持 iPhone、iPad、M 芯片 Mac)
-
-- `BARK_KEY ` _Bark 推送 key_
-- Bark 官网：https://bark.day.app/
-- 安装 Bark app，开启通知权限，拿到 key 后，把 BARK_KEY 配成你拿到的 key
-- `可选` 支持自定义 server, 配置成 BARK_SERVER ，默认为官方通道 https://api.day.app
-- 免费、开源、轻量；使用苹果 APNS 服务，及时、稳定、可靠；不会消耗设备的电量，基于系统推送服务与推送扩展，app 本体并不需要运行；隐私安全，可以通过一些方式确保包含作者本人在内的所有人都无法窃取你的隐私
-
-### 执行任务
-
-1. 点击**Action**，再点击**I understand my workflows, go ahead and enable them**
-2. 给自己仓库点个 start 或者修改任意文件后提交一次或者手动点击运行
-   ![](http://tu.yaohuo.me/imgs/2020/06/34ca160c972b9927.png)
-3. 每天早上 10:35 点执行任务
+1. 进入 **Actions** 页面
+2. 点击左侧 **Cloud check in action**
+3. 点击右侧 **Run workflow** → **Run workflow**
+4. 等待运行完成，查看日志确认签到成功
 
 ### 查看运行结果
 
-Actions > Cloud check in action > build
-![](https://cdn.jsdelivr.net/gh/wes-lin/Cloud189Checkin/image/action.png)
+1. 进入 **Actions** 页面
+2. 点击最近的一次 workflow 运行记录
+3. 展开 **Run** 步骤查看签到日志
+
+---
+
+## 设置推送通知
+
+在 `user` 环境中添加对应的变量即可启用推送，不配置则不推送。
+
+### Server 酱
+
+| 变量名 | 说明 |
+|---|---|
+| `SENDKEY` | Server 酱 SendKey，获取地址：[sct.ftqq.com](https://sct.ftqq.com/) |
+
+### Telegram Bot
+
+| 变量名 | 说明 |
+|---|---|
+| `TELEGRAM_BOT_TOKEN` | Telegram Bot Token，通过 [@BotFather](https://t.me/BotFather) 创建 |
+| `TELEGRAM_CHAT_ID` | 接收消息的会话 ID，可通过 [@userinfobot](https://t.me/userinfobot) 获取 |
+
+### 企业微信群机器人
+
+| 变量名 | 说明 |
+|---|---|
+| `WECOM_BOT_KEY` | 群机器人 Webhook Key，[配置说明](https://developer.work.weixin.qq.com/document/path/91770) |
+| `WECOM_BOT_TELPHONE` | 接收推送的手机号 |
+
+### WxPusher
+
+| 变量名 | 说明 |
+|---|---|
+| `WX_PUSHER_APP_TOKEN` | WxPusher App Token，默认使用公共 Token |
+| `WX_PUSHER_UID` | 接收推送的 UID，获取地址：[wxpusher.zjiecode.com](https://wxpusher.zjiecode.com/) |
+
+### PushPlus
+
+| 变量名 | 说明 |
+|---|---|
+| `PUSH_PLUS_TOKEN` | PushPlus Token，获取地址：[pushplus.plus](https://www.pushplus.plus/uc.html)，免费用户每天 200 条 |
+
+### Bark（仅 iOS / macOS Apple Silicon）
+
+| 变量名 | 说明 |
+|---|---|
+| `BARK_KEY` | Bark Key，安装 [Bark App](https://bark.day.app/) 后获取 |
+| `BARK_SERVER` | （可选）自定义服务器地址，默认 `https://api.day.app` |
+
+### ShowDoc
+
+| 变量名 | 说明 |
+|---|---|
+| `SHOWDOC_KEY` | ShowDoc 推送 Key，获取地址：[push.showdoc.com.cn](https://push.showdoc.com.cn) |
+
+---
+
+## 常见问题
+
+### Q: Actions 没有自动运行？
+
+- 确认已在 Actions 页面启用 workflow
+- 新 Fork 的仓库默认关闭 Actions，需要手动启用
+- 公共仓库的定时任务（schedule）在 60 天无提交后会自动禁用，workflow 中的 "Keep Running" 步骤会自动提交以保持活跃
+
+### Q: 报错 `SyntaxError: Unexpected token` ？
+
+- `TY_ACCOUNTS` 的值必须是合法的 JSON 格式
+- 检查是否有遗漏的引号、逗号或多余的空格
+- 可以在 [jsonlint.com](https://jsonlint.com) 验证你的 JSON
+
+### Q: 报错 `设备ID不存在` 或需要二次验证？
+
+- 参考 [#165](https://github.com/wes-lin/Cloud189Checkin/issues/165) 关闭设备锁
+
+### Q: 如何修改执行时间？
+
+- 编辑 `.github/workflows/run.yml` 中的 `cron` 表达式
+- 当前：`35 2 * * *`（UTC 02:35，北京时间 10:35）
+- cron 使用 UTC 时间，北京时间需要减 8 小时
+
+### Q: 如何查看历史运行记录？
+
+- 进入 **Actions** 页面，点击左侧的 workflow 名称即可查看所有历史运行
+
+---
 
 ## 本地运行
 
-### 环境配置
+### 环境要求
 
-```
+- Node.js 18+
 
-Node.js 18+
-
-```
-
-### 克隆项目
+### 步骤
 
 ```bash
+# 克隆项目
 git clone https://github.com/wes-lin/Cloud189Checkin.git
-```
-
-```bash
 cd Cloud189Checkin
-```
 
-### 安装依赖
-
-```bash
+# 安装依赖
 npm install
-```
 
-### 运行
+# 创建 .env 文件，填入账号信息
+# 方式一：
+echo 'TY_ACCOUNTS=[{"userName":"手机号","password":"密码"}]' > .env
 
-修改源码中.env 中环境变量
+# 方式二（可选，配置推送）：
+# echo 'TELEGRAM_BOT_TOKEN=xxx' >> .env
+# echo 'TELEGRAM_CHAT_ID=xxx' >> .env
 
-执行命令
-
-```bash
+# 运行
 npm start
 ```
 
-## 玄武-青龙面板
+---
 
-### [教程](doc/xuanwu)
+## 其他
 
-## 其他环境集成
-
-我已经把天翼网盘的相关 API 集成到 [SDK](https://github.com/wes-lin/cloud189-sdk) 了，有编程能力的同学可以自行拓展，集成到自己的代码环境。
-
-## 交流群
-
-![](https://cdn.jsdelivr.net/gh/wes-lin/Cloud189Checkin/image/group.jpg)
-
-## [更新内容](https://github.com/wes-lin/Cloud189Checkin/wiki/更新内容)
+- 天翼网盘 API 已集成到 [cloud189-sdk](https://github.com/wes-lin/cloud189-sdk)，可自行集成到其他环境
+- [更新日志](https://github.com/wes-lin/Cloud189Checkin/wiki/更新内容)
